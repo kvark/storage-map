@@ -5,9 +5,21 @@ use std::cell::UnsafeCell;
 use std::collections::hash_map::HashMap;
 use std::{hash, ops};
 
-pub struct StorageMap<L, K, V, S> {
+pub struct StorageMap<L, M> {
     lock: L,
-    map: UnsafeCell<HashMap<K, V, S>>,
+    map: UnsafeCell<M>,
+}
+
+unsafe impl<L: Send, M> Send for StorageMap<L, M> {}
+unsafe impl<L: Sync, M> Sync for StorageMap<L, M> {}
+
+impl<L: RawRwLock, M: Default> Default for StorageMap<L, M> {
+    fn default() -> Self {
+        StorageMap {
+            lock: L::INIT,
+            map: UnsafeCell::new(M::default()),
+        }
+    }
 }
 
 pub struct StorageMapGuard<'a, L: 'a + RawRwLock, V: 'a> {
@@ -33,7 +45,13 @@ impl<'a, L: RawRwLock, V> Drop for StorageMapGuard<'a, L, V> {
     }
 }
 
-impl<L, K, V, S> StorageMap<L, K, V, S>
+pub enum PrepareResult {
+    AlreadyExists,
+    UnableToCreate,
+    Created,
+}
+
+impl<L, K, V, S> StorageMap<L, HashMap<K, V, S>>
 where
     L: RawRwLock,
     K: Clone + Eq + hash::Hash,
@@ -46,6 +64,7 @@ where
         }
     }
 
+    /// The function is expected to always produce the same value given the same key.
     pub fn get_or_create_with<'a, F: FnOnce() -> V>(
         &'a self, key: &K, create_fn: F
     ) -> StorageMapGuard<'a, L, V> {
@@ -69,5 +88,29 @@ where
             value: &*map.entry(key.clone()).or_insert(value),
             exclusive: true,
         }
+    }
+
+    pub fn prepare_maybe<F: FnOnce() -> Option<V>>(
+        &self, key: &K, create_fn: F
+    ) -> PrepareResult {
+        self.lock.lock_shared();
+        // try mapping for reading first
+        let map = unsafe { &*self.map.get() };
+        let has = map.contains_key(key);
+        self.lock.unlock_shared();
+        if has {
+            return PrepareResult::AlreadyExists;
+        }
+        // try creating a new value
+        let value = match create_fn() {
+            Some(value) => value,
+            None => return PrepareResult::UnableToCreate,
+        };
+        // now actually lock for writes
+        self.lock.lock_exclusive();
+        let map = unsafe { &mut *self.map.get() };
+        map.insert(key.clone(), value);
+        self.lock.unlock_exclusive();
+        PrepareResult::Created
     }
 }
