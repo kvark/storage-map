@@ -6,6 +6,8 @@ use std::collections::hash_map::HashMap;
 use std::{fmt, hash, ops};
 
 
+/// `StorageMap` is a wrapper around `HashMap` that allows efficient concurrent
+/// access for the use case when only rarely the missing elements need to be created.
 pub struct StorageMap<L, M> {
     lock: L,
     map: UnsafeCell<M>,
@@ -29,6 +31,7 @@ impl<L, M: fmt::Debug> fmt::Debug for StorageMap<L, M> {
     }
 }
 
+/// An element guard that releases the lock when dropped.
 pub struct StorageMapGuard<'a, L: 'a + RawRwLock, V: 'a> {
     lock: &'a L,
     value: &'a V,
@@ -52,9 +55,13 @@ impl<'a, L: RawRwLock, V> Drop for StorageMapGuard<'a, L, V> {
     }
 }
 
+/// Result of preparing a particular key.
 pub enum PrepareResult {
+    /// Nothing is created, the key/value pair is already there.
     AlreadyExists,
+    /// Key was not found, but value creation failed.
     UnableToCreate,
+    /// Key was not found, but now the value has been created and inserted.
     Created,
 }
 
@@ -64,6 +71,7 @@ where
     K: Clone + Eq + hash::Hash,
     S: hash::BuildHasher,
 {
+    /// Create a new storage map with the given hasher.
     pub fn with_hasher(hash_builder: S) -> Self {
         StorageMap {
             lock: L::INIT,
@@ -71,7 +79,9 @@ where
         }
     }
 
-    /// The function is expected to always produce the same value given the same key.
+    /// Get a value associated with the key. The method assumes that more often then not
+    /// the value is already there. If it's not - the closure will be called to create one.
+    /// This closure is expected to always produce the same value given the same key.
     pub fn get_or_create_with<'a, F: FnOnce() -> V>(
         &'a self, key: &K, create_fn: F
     ) -> StorageMapGuard<'a, L, V> {
@@ -97,6 +107,8 @@ where
         }
     }
 
+    /// Make sure the given key is in the map, as a way to warm up
+    /// future run-time access to the map at the initialization stage.
     pub fn prepare_maybe<F: FnOnce() -> Option<V>>(
         &self, key: &K, create_fn: F
     ) -> PrepareResult {
