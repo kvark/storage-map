@@ -3,7 +3,8 @@ extern crate lock_api;
 use lock_api::RawRwLock;
 use std::cell::UnsafeCell;
 use std::collections::hash_map::HashMap;
-use std::{hash, ops};
+use std::{fmt, hash, ops};
+
 
 pub struct StorageMap<L, M> {
     lock: L,
@@ -19,6 +20,12 @@ impl<L: RawRwLock, M: Default> Default for StorageMap<L, M> {
             lock: L::INIT,
             map: UnsafeCell::new(M::default()),
         }
+    }
+}
+
+impl<L, M: fmt::Debug> fmt::Debug for StorageMap<L, M> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        self.map.get().fmt(formatter)
     }
 }
 
