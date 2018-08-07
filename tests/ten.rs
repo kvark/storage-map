@@ -28,3 +28,15 @@ fn fill_ten() {
         let _ = handle.join();
     }
 }
+
+#[test]
+fn whole_write() {
+    type Map = HashMap<u8, String, RandomState>;
+    let map = storage_map::StorageMap::<parking_lot::RawRwLock, Map>::with_hasher(RandomState::new());
+    map.get_or_create_with(&3, || "three".to_owned());
+    map.get_or_create_with(&5, || "five".to_owned());
+    let mut guard = map.whole_write();
+    for (_key, _value) in guard.drain() {
+        //nothing
+    }
+}

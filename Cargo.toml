@@ -1,6 +1,6 @@
 [package]
 name = "storage-map"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Dzmitry Malyshau <kvarkus@gmail.com>"]
 description = "Concurrent append-only map storage"
 documentation = "https://docs.rs/crate/storage-map"

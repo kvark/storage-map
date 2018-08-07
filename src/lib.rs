@@ -31,6 +31,7 @@ impl<L, M: fmt::Debug> fmt::Debug for StorageMap<L, M> {
     }
 }
 
+
 /// An element guard that releases the lock when dropped.
 pub struct StorageMapGuard<'a, L: 'a + RawRwLock, V: 'a> {
     lock: &'a L,
@@ -54,6 +55,31 @@ impl<'a, L: RawRwLock, V> Drop for StorageMapGuard<'a, L, V> {
         }
     }
 }
+
+pub struct WholeMapWriteGuard<'a, L: 'a + RawRwLock, M: 'a> {
+    lock: &'a L,
+    map: &'a mut M,
+}
+
+impl<'a, L: RawRwLock, M> ops::Deref for WholeMapWriteGuard<'a, L, M> {
+    type Target = M;
+    fn deref(&self) -> &M {
+        self.map
+    }
+}
+
+impl<'a, L: RawRwLock, M> ops::DerefMut for WholeMapWriteGuard<'a, L, M> {
+    fn deref_mut(&mut self) -> &mut M {
+        self.map
+    }
+}
+
+impl<'a, L: RawRwLock, V> Drop for WholeMapWriteGuard<'a, L, V> {
+    fn drop(&mut self) {
+        self.lock.unlock_exclusive();
+    }
+}
+
 
 /// Result of preparing a particular key.
 pub enum PrepareResult {
@@ -131,5 +157,14 @@ where
         map.insert(key.clone(), value);
         self.lock.unlock_exclusive();
         PrepareResult::Created
+    }
+
+    /// Lock the whole map for writing.
+    pub fn whole_write(&self) -> WholeMapWriteGuard<L, HashMap<K, V, S>> {
+        self.lock.lock_exclusive();
+        WholeMapWriteGuard {
+            lock: &self.lock,
+            map: unsafe { &mut *self.map.get() },
+        }
     }
 }
