@@ -8,6 +8,7 @@ homepage = "https://github.com/kvark/storage-map"
 repository = "https://github.com/kvark/storage-map"
 keywords = ["hashmap", "map", "concurrent", "lock"]
 license = "Apache-2.0"
+edition = "2018"
 
 [dependencies]
 lock_api = "0.3.1"
