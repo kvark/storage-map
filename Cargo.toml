@@ -1,6 +1,6 @@
 [package]
 name = "storage-map"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Dzmitry Malyshau <kvarkus@gmail.com>"]
 description = "Concurrent append-only map storage"
 documentation = "https://docs.rs/crate/storage-map"
@@ -11,7 +11,7 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-lock_api = "0.3.1"
+lock_api = "0.4"
 
 [dev-dependencies]
-parking_lot = "0.9.0"
+parking_lot = "0.11"
